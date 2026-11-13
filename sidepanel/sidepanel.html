@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZapBot Pro - Painel de Controle</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-brand">
+        <img class="brand-logo" src="logo-mark.png" alt="ZapBot Pro">
+        <div>
+          <h1 class="brand-title">ZapBot Pro</h1>
+          <span class="brand-subtitle">WhatsApp Web & IA</span>
+        </div>
+      </div>
+      <div class="header-status">
+        <span class="status-indicator" id="wa-connection-dot"></span>
+        <span id="wa-connection-text">Verificando...</span>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="nav-tab active" data-tab="tab-ai">
+        <span class="tab-icon">🤖</span>
+        <span>Atendente IA</span>
+      </button>
+      <button class="nav-tab" data-tab="tab-bulk">
+        <span class="tab-icon">🚀</span>
+        <span>Disparador</span>
+      </button>
+      <button class="nav-tab" data-tab="tab-groups">
+        <span class="tab-icon">👥</span>
+        <span>Grupos</span>
+      </button>
+      <button class="nav-tab" data-tab="tab-lists">
+        <span class="tab-icon">📋</span>
+        <span>Listas</span>
+      </button>
+      <button class="nav-tab" data-tab="tab-logs">
+        <span class="tab-icon">📊</span>
+        <span>Logs</span>
+      </button>
+      <button class="nav-tab" data-tab="tab-settings">
+        <span class="tab-icon">⚙️</span>
+        <span>Config</span>
+      </button>
+    </nav>
+
+    <!-- Content Sections -->
+    <main class="tab-content">
+      <!-- ABA 1: ATENDENTE IA -->
+      <section id="tab-ai" class="tab-pane active">
+        <div class="card master-switch-card">
+          <div class="switch-header">
+            <div>
+              <h3 class="switch-title">Auto-Resposta por IA</h3>
+              <p class="switch-description">Responder mensagens automaticamente baseado nas regras abaixo.</p>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="ai-master-toggle">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">Configurações do Modelo</h3>
+          <div class="form-group">
+            <label for="ai-provider">Provedor de IA:</label>
+            <select id="ai-provider" class="form-input">
+              <option value="deepseek">DeepSeek (V3 / R1 — Recomendado)</option>
+              <option value="gemini">Google Gemini (Flash / Pro)</option>
+              <option value="openai">OpenAI (GPT-4o mini)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="ai-model">Modelo de IA:</label>
+            <select id="ai-model" class="form-input">
+              <!-- Preenchido dinamicamente conforme o provedor -->
+            </select>
+          </div>
+
+          <div class="form-group" id="group-deepseek-key">
+            <label for="deepseek-key">Chave de API do DeepSeek:</label>
+            <input type="password" id="deepseek-key" class="form-input" placeholder="sk-...">
+            <small class="form-hint">Obtenha sua chave em platform.deepseek.com</small>
+          </div>
+
+          <div class="form-group hidden" id="group-gemini-key">
+            <label for="gemini-key">Chave de API do Gemini:</label>
+            <input type="password" id="gemini-key" class="form-input" placeholder="Cole sua chave AI Studio aqui...">
+            <small class="form-hint">Obtenha sua chave gratuita em aistudio.google.com</small>
+          </div>
+
+          <div class="form-group hidden" id="group-openai-key">
+            <label for="openai-key">Chave de API da OpenAI:</label>
+            <input type="password" id="openai-key" class="form-input" placeholder="sk-...">
+          </div>
+
+          <div class="form-group">
+            <label for="ai-target-list">Responder apenas contatos de:</label>
+            <select id="ai-target-list" class="form-input">
+              <option value="all">Todas as conversas (Geral)</option>
+              <!-- Preenchido dinamicamente com listas criadas -->
+            </select>
+            <small class="form-hint">A IA só responderá se a conversa estiver na lista selecionada.</small>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">👥 Grupos Monitorados (Suporte)</h3>
+          <p class="card-description">A IA responde no grupo apenas quando @mencionada ou quando respondem a uma mensagem dela. Sem resposta, o temporizador cobra retorno.</p>
+
+          <div class="form-group">
+            <label for="me-phone-input">Meu número (DDI) — para detectar @menção:</label>
+            <input type="text" id="me-phone-input" class="form-input" placeholder="5521999999999">
+          </div>
+
+          <div class="form-group">
+            <label for="me-name-input">Meu nome (opcional) — detecta menção por nome:</label>
+            <input type="text" id="me-name-input" class="form-input" placeholder="Ex: ZapBot">
+          </div>
+
+          <div class="form-group">
+            <label for="monitored-group-name">Cadastrar grupo pelo nome:</label>
+            <div class="inline-form">
+              <input type="text" id="monitored-group-name" class="form-input flex-1" placeholder="Nome do grupo no WhatsApp">
+              <button id="btn-add-monitored-group" class="btn btn-primary">+ Cadastrar</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <button id="btn-use-open-group" class="btn btn-secondary full-width">🎯 Usar grupo aberto no WhatsApp</button>
+            <small class="form-hint">Abra o grupo no WhatsApp Web e clique para cadastrá-lo com o nome exato.</small>
+          </div>
+
+          <div id="monitored-groups-list" class="lists-cards">
+            <!-- Renderizado dinamicamente -->
+          </div>
+
+          <div class="form-group">
+            <label for="followup-minutes-input">Cobrar retorno após (minutos):</label>
+            <input type="number" id="followup-minutes-input" class="form-input" min="1" max="240" value="15">
+          </div>
+
+          <div class="form-group">
+            <label for="followup-max-input">Máximo de cobranças por chamado:</label>
+            <input type="number" id="followup-max-input" class="form-input" min="1" max="50" value="5">
+          </div>
+
+          <div class="form-group">
+            <label for="followup-message-input">Mensagem de cobrança:</label>
+            <textarea id="followup-message-input" class="form-textarea" rows="2">⚠️ Só confirmando: ainda precisa de ajuda com o chamado? Aguardo seu retorno.</textarea>
+          </div>
+
+          <button id="btn-save-groups" class="btn btn-primary full-width">Salvar grupos e temporizador</button>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">Treinamento & Instruções (Prompt)</h3>
+          <div class="form-group">
+            <label for="ai-prompt">Instruções para o Assistente:</label>
+            <textarea id="ai-prompt" class="form-textarea" rows="4" placeholder="Ex: Você é o atendente da loja X. Seja cordial, tire dúvidas sobre entregas e produtos..."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="ai-faq">Base de Conhecimento / FAQ (Produtos, Valores, Regras):</label>
+            <textarea id="ai-faq" class="form-textarea" rows="4" placeholder="Cole aqui lista de produtos, preços, links ou informações que a IA deve saber..."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="ai-cooldown">Pausa após intervenção humana (minutos):</label>
+            <input type="number" id="ai-cooldown" class="form-input" min="1" max="120" value="10">
+            <small class="form-hint">Se você digitar no chat manualmente, a IA pausa para aquele cliente.</small>
+          </div>
+
+          <button id="btn-save-ai" class="btn btn-primary full-width">Salvar Configurações da IA</button>
+        </div>
+      </section>
+
+      <!-- ABA 2: DISPARADOR EM MASSA -->
+      <section id="tab-bulk" class="tab-pane">
+        <div class="card">
+          <h3 class="card-title">Destinatários</h3>
+          <div class="form-group">
+            <label for="bulk-list-select">Carregar contatos da lista:</label>
+            <select id="bulk-list-select" class="form-input">
+              <option value="">Selecione uma lista...</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="bulk-csv-input">Ou importar arquivo CSV:</label>
+            <input type="file" id="bulk-csv-input" accept=".csv, .txt" class="form-input">
+            <small class="form-hint">Formato CSV: telefone,nome (uma linha por contato)</small>
+          </div>
+
+          <div class="contacts-preview-badge" id="contacts-loaded-count">0 contatos carregados</div>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">Mensagem da Campanha</h3>
+          <div class="variables-bar">
+            <span>Tags dinâmicas:</span>
+            <button type="button" class="tag-btn" data-tag="{{nome}}">{{nome}}</button>
+            <button type="button" class="tag-btn" data-tag="{{saudacao}}">{{saudacao}}</button>
+          </div>
+          <div class="form-group">
+            <textarea id="bulk-message-text" class="form-textarea" rows="5" placeholder="Olá {{nome}}, {{saudacao}}! Tudo bem?"></textarea>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">Controle Anti-Ban (Intervalo entre envios)</h3>
+          <div class="delay-slider-container">
+            <div class="delay-labels">
+              <span>Mínimo: <b id="min-delay-val">8s</b></span>
+              <span>Máximo: <b id="max-delay-val">20s</b></span>
+            </div>
+            <div class="slider-inputs">
+              <input type="range" id="min-delay-slider" min="4" max="30" value="8" class="range-slider">
+              <input type="range" id="max-delay-slider" min="10" max="60" value="20" class="range-slider">
+            </div>
+          </div>
+
+          <!-- Ações do disparador -->
+          <div class="campaign-actions">
+            <button id="btn-start-bulk" class="btn btn-primary flex-1">▶ Iniciar Disparos</button>
+            <button id="btn-pause-bulk" class="btn btn-secondary" disabled>⏸ Pausar</button>
+            <button id="btn-stop-bulk" class="btn btn-danger" disabled>⏹ Parar</button>
+          </div>
+
+          <div class="progress-container hidden" id="campaign-progress-box">
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="campaign-progress-bar"></div>
+            </div>
+            <div class="progress-status-text" id="campaign-progress-text">0 de 0 enviados</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ABA 3: EXTRATOR DE GRUPOS -->
+      <section id="tab-groups" class="tab-pane">
+        <div class="card">
+          <h3 class="card-title">Extração com 1 Clique</h3>
+          <p class="card-description">Abra qualquer grupo no WhatsApp Web e clique no botão abaixo para extrair todos os membros.</p>
+          <button id="btn-extract-group" class="btn btn-success full-width">⚡ Extrair Participantes do Grupo Aberto</button>
+        </div>
+
+        <div class="card">
+          <div class="card-header-actions">
+            <h3 class="card-title">Resultado da Extração (<span id="extracted-count">0</span>)</h3>
+            <div class="group-btn-row">
+              <button id="btn-download-csv" class="btn btn-sm btn-secondary" disabled>📥 Baixar CSV</button>
+              <button id="btn-save-as-list" class="btn btn-sm btn-primary" disabled>💾 Salvar na Lista</button>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Telefone</th>
+                  <th>Nome</th>
+                  <th>Função</th>
+                </tr>
+              </thead>
+              <tbody id="extracted-table-body">
+                <tr>
+                  <td colspan="4" class="empty-state">Nenhum grupo extraído ainda. Abra um grupo no WhatsApp e clique em "Extrair".</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ABA 4: GERENCIADOR DE LISTAS -->
+      <section id="tab-lists" class="tab-pane">
+        <div class="card">
+          <h3 class="card-title">Criar Nova Lista</h3>
+          <div class="inline-form">
+            <input type="text" id="new-list-name" class="form-input flex-1" placeholder="Nome da lista (ex: Leads Quentes)">
+            <button id="btn-create-list" class="btn btn-primary">Criar Lista</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">Suas Listas de Contatos</h3>
+          <p class="card-description">Clique em uma lista para visualizar, adicionar ou remover contatos individualmente.</p>
+          <div id="lists-container" class="lists-cards">
+            <!-- Renderizado dinamicamente com suporte a CRUD de contatos -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ABA 5: HISTÓRICO & LOGS -->
+      <section id="tab-logs" class="tab-pane">
+        <div class="card">
+          <div class="card-header-actions">
+            <h3 class="card-title">Logs Recentes</h3>
+            <button id="btn-clear-logs" class="btn btn-sm btn-secondary">Limpar Logs</button>
+          </div>
+          <div class="logs-feed" id="logs-container">
+            <!-- Logs renderizados via JS -->
+            <div class="empty-state">Nenhuma atividade registrada ainda.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ABA 6: CONFIGURAÇÕES & SELETORES DOM -->
+      <section id="tab-settings" class="tab-pane">
+        <div class="card">
+          <div class="card-header-actions">
+            <div>
+              <h3 class="card-title">⚙️ Seletores DOM do WhatsApp</h3>
+              <p class="card-description">Personalize os seletores caso uma atualização do WhatsApp Web altere elementos na tela.</p>
+            </div>
+            <button id="btn-reset-selectors" class="btn btn-sm btn-secondary" title="Restaura os seletores padrão originais">🔄 Padrões</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="form-group">
+            <label for="sel-unreadBadge">Badge de Não Lida (unreadBadge):</label>
+            <input type="text" id="sel-unreadBadge" class="form-input selector-input" placeholder='[data-testid="icon-unread-count"]'>
+            <small class="form-hint">Badge que indica mensagens não lidas na lista lateral.</small>
+          </div>
+
+          <div class="form-group">
+            <label for="sel-chatFrame">Item de Conversa (chatFrame):</label>
+            <input type="text" id="sel-chatFrame" class="form-input selector-input" placeholder='[data-testid="cell-frame-container"]'>
+            <small class="form-hint">Container clicável de cada conversa na barra lateral.</small>
+          </div>
+
+          <div class="form-group">
+            <label for="sel-chatFrameTitle">Título do Item de Conversa (chatFrameTitle):</label>
+            <input type="text" id="sel-chatFrameTitle" class="form-input selector-input" placeholder='[data-testid="cell-frame-title"] span[title]'>
+            <small class="form-hint">Elemento que exibe o telefone/nome na lista lateral.</small>
+          </div>
+
+          <div class="form-group">
+            <label for="sel-composeBox">Caixa de Digitação (composeBox):</label>
+            <input type="text" id="sel-composeBox" class="form-input selector-input" placeholder='[data-testid="conversation-compose-box-input"]'>
+            <small class="form-hint">Campo editável no rodapé onde a mensagem é digitada.</small>
+          </div>
+
+          <div class="form-group">
+            <label for="sel-sendButton">Botão Enviar (sendButton):</label>
+            <input type="text" id="sel-sendButton" class="form-input selector-input" placeholder='footer span[data-testid="wds-ic-send-filled"]'>
+            <small class="form-hint">Ícone ou botão de envio no rodapé do chat aberto.</small>
+          </div>
+
+          <div class="form-group">
+            <label for="sel-messageHistory">Balões de Mensagem (messageHistory):</label>
+            <input type="text" id="sel-messageHistory" class="form-input selector-input" placeholder='div[data-pre-plain-text]'>
+            <small class="form-hint">Container das mensagens no histórico da conversa aberta.</small>
+          </div>
+
+          <div class="form-group">
+            <label for="sel-messageText">Texto da Mensagem (messageText):</label>
+            <input type="text" id="sel-messageText" class="form-input selector-input" placeholder='span.selectable-text'>
+            <small class="form-hint">Elemento que contém o texto dentro do balão de mensagem.</small>
+          </div>
+
+          <div class="form-group">
+            <label for="sel-activeContactHeader">Nome do Contato Ativo (activeContactHeader):</label>
+            <input type="text" id="sel-activeContactHeader" class="form-input selector-input" placeholder='#main header span[title]'>
+            <small class="form-hint">Título no topo do chat aberto identificando o contato atual.</small>
+          </div>
+
+          <div class="campaign-actions">
+            <button id="btn-save-selectors" class="btn btn-primary flex-1">💾 Salvar Seletores</button>
+            <button id="btn-auto-detect-selectors" class="btn btn-secondary">🤖 Auto-detectar com IA</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer Toast Feedback -->
+    <div id="sidepanel-toast" class="sidepanel-toast hidden"></div>
+  </div>
+
+  <script src="../modules/storage-manager.js"></script>
+  <script src="sidepanel.js"></script>
+</body>
+</html>
