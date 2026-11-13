@@ -89,7 +89,7 @@ Bot/
 │   ├── sidepanel.html         # Interface completa com 5 abas
 │   ├── sidepanel.css          # Tema moderno Dark Mode
 │   └── sidepanel.js           # Lógica do painel de controle
-└── legacy_python/             # Arquivos legados do antigo bot em Python/Selenium
+└── tests/                     # Testes automatizados da extensão
 ```
 
 ## Licença
