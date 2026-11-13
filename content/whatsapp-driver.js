@@ -225,54 +225,13 @@ const WADriver = {
     };
 
     const inicio = Date.now();
+    let indice = 0;
     while (Date.now() - inicio < timeout) {
       const campo = WADriver.queryElSync('composeBox');
+      if (campo && (!contatoId || WADriver.capturarDestino(contatoId))) return true;
 
-      if (campo) {
-        if (!contatoId) return true;
-
-        // Confirma o chat aberto testando TODOS os candidatos de título do cabeçalho
-        // (no header de grupo o primeiro span[title] pode não ser o nome do grupo)
-        const candidatos = [];
-        try {
-          document
-            .querySelectorAll('#main header span[title], #main header h2, #main header div[title]')
-            .forEach((el) => {
-              const v = (el.getAttribute('title') || el.innerText || '').toString().trim();
-              if (v) candidatos.push(v);
-            });
-        } catch (_) { }
-
-        // Sem nenhum título identificável, aceita (mesmo comportamento anterior)
-        if (candidatos.length === 0) return true;
-
-        const bateu = candidatos.some((h) => {
-          const a = (contatoId || '').toLowerCase();
-          const b = h.toLowerCase();
-          if (a === b || a.includes(b) || b.includes(a)) return true;
-          if (
-            typeof ZapStorage !== 'undefined' &&
-            ZapStorage._nomesCombinam &&
-            ZapStorage._nomesCombinam(contatoId, h)
-          ) {
-            return true;
-          }
-          const digitosA = a.replace(/\D/g, '');
-          const digitosB = b.replace(/\D/g, '');
-          if (digitosA && digitosB && (digitosA.endsWith(digitosB) || digitosB.endsWith(digitosA))) {
-            return true;
-          }
-          return false;
-        });
-
-        if (bateu) return true;
-      }
-
-      // (Re)clica até conseguir abrir — o primeiro clique às vezes não troca de chat
-      for (const alvo of alvos) {
-        clicar(alvo);
-      }
-
+      // Dá tempo para o WhatsApp atualizar o cabeçalho após cada clique.
+      clicar(alvos[indice++ % alvos.length]);
       await new Promise((r) => setTimeout(r, 400));
     }
 
@@ -548,15 +507,20 @@ ${htmlTrecho}`;
    * Obtém o número ou nome do contato da conversa atualmente ativa
    */
   obterContatoAtivo() {
-    const el = WADriver.queryElSync('activeContactHeader');
-    return el ? el.getAttribute('title') || el.innerText : null;
+    return WADriver.tituloDoCabecalho(document.querySelector('#main header'));
+  },
+
+  tituloDoCabecalho(header) {
+    if (!header) return null;
+    // O atributo title pode pertencer ao subtítulo com os participantes.
+    const linhas = (header.innerText || '').split('\n').map((linha) => linha.trim());
+    return linhas.find(Boolean) || null;
   },
 
   capturarDestino(nome) {
     const header = document.querySelector('#main header');
-    if (!header) return null;
-    const titulos = [...header.querySelectorAll('span[title], h2, div[title]')];
-    if (!titulos.some((el) => (el.getAttribute('title') || el.innerText || '').trim() === nome)) return null;
+    const titulo = WADriver.tituloDoCabecalho(header);
+    if (!titulo || titulo.normalize('NFC') !== nome.trim().normalize('NFC')) return null;
     const grupo = WADriver.obterGrupoDoChatAtivo();
     return { header, nome, grupo, telefone: grupo.isGroup ? null : WADriver.obterTelefoneDoChatAtivo() };
   },
@@ -666,7 +630,7 @@ ${htmlTrecho}`;
 
         // Cabeçalho com lista de membros/contagem → grupo (id desconhecido)
         const header = mainChat.querySelector('header');
-        if (header && WADriver.subtituloIndicaGrupo((header.innerText || '').split('\n').slice(1).join('\n'))) {
+        if (header && WADriver.subtituloIndicaGrupo((header.innerText || '').split('\n').filter((linha) => linha.trim()).slice(1).join('\n'))) {
           return { isGroup: true, groupId: null };
         }
       }

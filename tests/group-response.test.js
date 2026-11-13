@@ -6,6 +6,26 @@ const vm = require('node:vm');
 const MentionDetector = require('../modules/mention-detector');
 const { WADriver } = require('../content/whatsapp-driver');
 
+test('identifica o título visível do grupo quando apenas os participantes têm atributo title', (t) => {
+  const header = {
+    innerText: 'TESTE\nParticipante, Você',
+    querySelectorAll: () => [{ getAttribute: () => 'Participante, Você' }]
+  };
+  t.mock.method(WADriver, 'obterGrupoDoChatAtivo', () => ({ isGroup: true, groupId: '123' }));
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  Object.defineProperty(globalThis, 'document', {
+    value: { querySelector: () => header }, configurable: true
+  });
+  t.after(() => {
+    if (descriptor) Object.defineProperty(globalThis, 'document', descriptor);
+    else delete globalThis.document;
+  });
+
+  assert.equal(WADriver.obterContatoAtivo(), 'TESTE');
+  assert.equal(WADriver.capturarDestino('TESTE')?.grupo.groupId, '123');
+  assert.equal(WADriver.capturarDestino('Participante, Você'), null);
+});
+
 test('troca de chat durante a preparação impede o clique de envio', async (t) => {
   let verificacoes = 0;
   let cliques = 0;
