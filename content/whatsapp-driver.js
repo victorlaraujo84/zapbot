@@ -447,7 +447,7 @@ ${htmlTrecho}`;
 
       verificar();
       if (conferirDestino && inputMsg.textContent.trim()) throw new Error('O chat contém um rascunho.');
-      const anteriores = new Set(WADriver.obterMensagensAtuais(20).map((m) => m.id || m.elemento));
+      const anteriores = new Set(conferirDestino ? WADriver.baloesDeSaida().map(({ chave }) => chave) : []);
       inputMsg.focus();
 
       // Insere o texto preservando quebras de linha e acentos
@@ -486,13 +486,10 @@ ${htmlTrecho}`;
         await new Promise((r) => setTimeout(r, 500));
         return;
       }
-      const prazo = Date.now() + 4000;
+      const prazo = Date.now() + 10000;
       while (Date.now() < prazo) {
         verificar();
-        const enviada = WADriver.obterMensagensAtuais(20).some((m) =>
-          m.isMe && m.texto === texto.trim() && !anteriores.has(m.id || m.elemento)
-        );
-        if (enviada) return;
+        if (WADriver.mensagemDeSaidaConfirmada(texto, anteriores)) return;
         await new Promise((r) => setTimeout(r, 200));
       }
       const erro = new Error('Envio sem confirmação no chat. Confira a conversa antes de reenviar.');
@@ -501,6 +498,28 @@ ${htmlTrecho}`;
     } finally {
       WADriver._enviando = false;
     }
+  },
+
+  baloesDeSaida() {
+    const main = document.querySelector('#main');
+    if (!main) return [];
+    return [...main.querySelectorAll('.message-out, [data-id^="true_"], [data-assigned-id^="true_"]')]
+      .map((elemento) => ({
+        elemento,
+        chave: elemento.getAttribute('data-id') || elemento.getAttribute('data-assigned-id') || elemento
+      }));
+  },
+
+  mensagemDeSaidaConfirmada(texto, anteriores) {
+    const normalizar = (valor) => (valor || '').normalize('NFC').replace(/\s+/g, ' ').trim();
+    const esperado = normalizar(texto);
+    const seletor = WADriver._getSelector('messageText') || 'span.selectable-text';
+    return WADriver.baloesDeSaida().some(({ elemento, chave }) => {
+      if (anteriores.has(chave)) return false;
+      const corpo = elemento.querySelector(seletor) ||
+        elemento.querySelector('[data-testid="selectable-text"], .selectable-text, .copyable-text');
+      return !!corpo && normalizar(corpo.innerText || corpo.textContent) === esperado;
+    });
   },
 
   /**

@@ -5,6 +5,8 @@
 
 let monitoramentoIniciado = false;
 let campanhaEmAndamento = false;
+let cicloDeAtendimento = null;
+let comandosDeChatPendentes = 0;
 let campaignState = {
   running: false,
   paused: false
@@ -172,7 +174,6 @@ function monitorarIntervencaoHumana() {
  * Substitui o antigo modo reativo (que só olhava o chat aberto na tela).
  */
 function iniciarVarreduraChatsNaoLidos() {
-  let varreduraEmAndamento = false;
   const timerVarredura = setInterval(async () => {
     if (!ZapStorage.isContextValid()) {
       clearInterval(timerVarredura);
@@ -180,19 +181,21 @@ function iniciarVarreduraChatsNaoLidos() {
     }
 
     // Evita sobreposição de ciclos de varredura
-    if (varreduraEmAndamento) return;
+    if (cicloDeAtendimento || comandosDeChatPendentes) return;
     // Se já há contatos sendo processados, aguarda este ciclo terminar
     if (contatosEmProcessamento.size > 0) return;
     // Não interfere na campanha de disparo em massa
     if (campaignState.running) return;
 
-    varreduraEmAndamento = true;
-    try {
+    cicloDeAtendimento = (async () => {
       const settings = await ZapStorage.getSettings();
       if (!settings.ai_enabled) return;
 
       await varreduraChatsNaoLidos(settings);
-      await processarFollowups(settings);
+      if (!comandosDeChatPendentes) await processarFollowups(settings);
+    })();
+    try {
+      await cicloDeAtendimento;
     } catch (e) {
       console.warn('[ZapBot Pro] Erro no ciclo de varredura:', e);
       // Registra falhas silenciosas no Log (antes elas só apareciam no console)
@@ -201,7 +204,7 @@ function iniciarVarreduraChatsNaoLidos() {
         ZapStorage.addLog('SYSTEM', '-', `Erro no ciclo de varredura: ${msg}`, 'error').catch(() => {});
       }
     } finally {
-      varreduraEmAndamento = false;
+      cicloDeAtendimento = null;
     }
   }, 10000); // Ciclo a cada 10 segundos
 }
@@ -221,6 +224,7 @@ async function varreduraChatsNaoLidos(settings) {
   let naoLidasEncontradas = 0;
 
   for (const frame of frames) {
+    if (comandosDeChatPendentes) break;
     // Verifica se este frame tem badge de não lida (badge, aria-label ou data-icon)
     const naoLida = WADriver.temMensagemNaoLida(frame);
 
@@ -638,6 +642,7 @@ async function processarFollowups(settings) {
     const processadas = new Set();
 
     for (const grupo of grupos) {
+      if (comandosDeChatPendentes) break;
       const chave = chaveGrupo(grupo);
       if (processadas.has(chave)) continue; // mesmo grupo na seção E na lista
       processadas.add(chave);
@@ -677,7 +682,15 @@ async function processarFollowups(settings) {
       if (!destino || !FollowupEngine.confirmarGrupoAlvo(destino.grupo, grupo)) continue;
       const resultado = FollowupEngine.avaliar(followups, chave, Date.now(), houveResposta, config);
       if (resultado.acao === 'enviar') {
-        await WADriver.enviarMensagemTexto(resultado.mensagem, () => WADriver.destinoConfere(destino));
+        try {
+          await WADriver.enviarMensagemTexto(resultado.mensagem, () => WADriver.destinoConfere(destino));
+        } catch (erro) {
+          if (erro.code !== 'SEND_UNCONFIRMED') throw erro;
+          delete followups[chave];
+          await ZapStorage.set({ followups });
+          await ZapStorage.addLog('AI_RESPONSE', grupo.name, erro.message, 'error');
+          continue;
+        }
         await ZapStorage.addLog('AI_RESPONSE', grupo.name, resultado.mensagem, 'success');
         showToast(`⏰ Cobrança enviada no grupo ${grupo.name}`, 'info');
       } else if (resultado.acao === 'limpar') {
@@ -699,8 +712,22 @@ async function processarFollowups(settings) {
 /**
  * Escuta comandos vindos do Painel Lateral (Side Panel)
  */
+let filaDeComandosDeChat = Promise.resolve();
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  const alteraChat = ['OPEN_CHAT', 'EXTRACT_GROUP', 'START_BULK_SEND', 'RESUME_BULK_SEND'].includes(message?.action);
+  let anterior;
+  let liberar;
+  if (alteraChat) {
+    comandosDeChatPendentes++;
+    anterior = filaDeComandosDeChat;
+    filaDeComandosDeChat = new Promise((resolve) => { liberar = resolve; });
+  }
   (async () => {
+    if (alteraChat) {
+      await anterior;
+      await cicloDeAtendimento?.catch(() => {});
+    }
     const { action, payload } = message || {};
 
     switch (action) {
@@ -803,11 +830,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         // Responde antes de navegar: o deep link do WhatsApp recarrega a página
         sendResponse({ success: true, phone });
-        setTimeout(() => {
-          try {
-            WADriver.navegarParaConversa(phone);
-          } catch (_) { }
-        }, 200);
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        WADriver.navegarParaConversa(phone);
         break;
       }
 
@@ -843,7 +867,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       default:
         sendResponse({ success: false, error: 'Comando não reconhecido' });
     }
-  })();
+  })().catch((erro) => {
+    sendResponse({ success: false, error: erro.message });
+  }).finally(() => {
+    if (alteraChat) {
+      comandosDeChatPendentes--;
+      liberar();
+    }
+  });
 
   return true;
 });
