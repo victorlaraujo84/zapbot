@@ -6,6 +6,24 @@ const vm = require('node:vm');
 const MentionDetector = require('../modules/mention-detector');
 const { WADriver } = require('../content/whatsapp-driver');
 
+test('identifica grupo pelo botão Dados do grupo sem ID nem subtítulo', (t) => {
+  const botao = { getAttribute: (nome) => nome === 'aria-label' ? 'Dados do grupo' : null };
+  const header = {
+    innerText: 'TESTE',
+    querySelector: (seletor) => seletor === '[data-testid="conversation-info-header-button"]' ? botao : null
+  };
+  const main = { querySelector: () => header, querySelectorAll: () => [] };
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  Object.defineProperty(globalThis, 'document', {
+    value: { querySelector: (seletor) => seletor === '#main' ? main : header }, configurable: true
+  });
+  t.after(() => {
+    if (descriptor) Object.defineProperty(globalThis, 'document', descriptor);
+    else delete globalThis.document;
+  });
+  assert.deepEqual(WADriver.capturarDestino('TESTE')?.grupo, { isGroup: true, groupId: null });
+});
+
 test('identifica o título visível do grupo quando apenas os participantes têm atributo title', (t) => {
   const header = {
     innerText: 'TESTE\nParticipante, Você',

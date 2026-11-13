@@ -611,8 +611,8 @@ ${htmlTrecho}`;
 
   /**
    * Detecta se o chat aberto é um grupo e devolve o id do grupo.
-   * Sinais (em ordem): data-id/data-assigned-id com @g.us; subtítulo do
-   * cabeçalho com membros; varredura no documento inteiro como último recurso.
+   * Sinais do chat ativo: ID com @g.us, botão de dados do grupo ou
+   * subtítulo com participantes.
    * @returns {{isGroup:boolean, groupId:string|null}}
    */
   obterGrupoDoChatAtivo() {
@@ -630,6 +630,11 @@ ${htmlTrecho}`;
 
         // Cabeçalho com lista de membros/contagem → grupo (id desconhecido)
         const header = mainChat.querySelector('header');
+        const botao = header?.querySelector('[data-testid="conversation-info-header-button"]');
+        const rotulos = [botao?.getAttribute('aria-label'), botao?.getAttribute('title')];
+        if (rotulos.some((rotulo) => /^(dados do grupo|informações do grupo|group info)$/i.test((rotulo || '').trim()))) {
+          return { isGroup: true, groupId: null };
+        }
         if (header && WADriver.subtituloIndicaGrupo((header.innerText || '').split('\n').filter((linha) => linha.trim()).slice(1).join('\n'))) {
           return { isGroup: true, groupId: null };
         }
