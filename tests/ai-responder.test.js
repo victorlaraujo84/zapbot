@@ -4,6 +4,19 @@ const assert = require('node:assert');
 require('./helpers/chrome-mock.js');
 const AIResponder = require('../modules/ai-responder.js');
 
+test('pedido atual e citação chegam como campos separados à IA', async (t) => {
+  const provedor = t.mock.method(AIResponder, 'chamarDeepSeek', async () => 'ok');
+  const settings = { ai_provider: 'deepseek' };
+  await AIResponder.gerarResposta('@ZapBot, o que verifico?', ['Cliente: outro assunto'], settings, null,
+    { autor: 'Ana', texto: 'A VPN parou após a troca de senha' });
+  const [, sistema, prompt] = provedor.mock.calls[0].arguments;
+  assert.match(sistema, /pedido atual/i);
+  assert.match(prompt, /"pedidoAtual":"@ZapBot, o que verifico\?"/);
+  assert.match(prompt, /"citacao":\{"autor":"Ana","texto":"A VPN parou após a troca de senha"\}/);
+  await AIResponder.gerarResposta('@ZapBot, pode ajudar?', [], settings, null, { autor: 'Ana', texto: null });
+  assert.match(provedor.mock.calls[1].arguments[1], /peça o detalhe/i);
+});
+
 test('usa contexto salvo no lugar do histórico do DOM', async () => {
   let corpoEnviado = null;
   global.fetch = async (url, opts) => {

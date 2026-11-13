@@ -6,6 +6,16 @@ const vm = require('node:vm');
 const MentionDetector = require('../modules/mention-detector');
 const { WADriver } = require('../content/whatsapp-driver');
 
+test('lê autor e conteúdo da citação e sinaliza mídia sem texto', () => {
+  const bloco = { innerText: 'Ana\nA VPN parou.\nO erro aparece no login.', querySelector: () => null };
+  const elemento = { closest: () => null, querySelector: () => bloco, querySelectorAll: () => [] };
+  const dados = WADriver.dadosDaMensagem(elemento, '@ZapBot, o que verifico?');
+  assert.deepEqual(dados.citacao, { autor: 'Ana', texto: 'A VPN parou.\nO erro aparece no login.' });
+  assert.equal(dados.texto, '@ZapBot, o que verifico?');
+  bloco.innerText = 'Ana\nFoto';
+  assert.deepEqual(WADriver.dadosDaMensagem(elemento, dados.texto).citacao, { autor: 'Ana', texto: null });
+});
+
 test('confirma balão de saída renderizado sem data-pre-plain-text e com quebras diferentes', (t) => {
   const texto = { innerText: 'Olá!\nTudo bem?\u00a0' };
   const balão = {

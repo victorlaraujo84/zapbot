@@ -39,8 +39,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       switch (action) {
         case 'GENERATE_AI_RESPONSE': {
-          const { prompt, history, settings, contextoSalvo } = payload || {};
-          const resposta = await AIResponder.gerarResposta(prompt, history, settings, contextoSalvo);
+          const { prompt, history, settings, contextoSalvo, citacao } = payload || {};
+          const resposta = await AIResponder.gerarResposta(prompt, history, settings, contextoSalvo, citacao);
           sendResponse({ success: true, text: resposta });
           break;
         }

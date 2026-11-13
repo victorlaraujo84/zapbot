@@ -697,14 +697,17 @@ ${htmlTrecho}`;
   /**
    * Coleta os dados da última mensagem visível do chat aberto:
    * texto, menções (@telefone) e autor da citação (quote), se houver.
-   * @returns {{texto:string, mentions:string[], autorQuote:string|null}|null}
+   * @returns {{texto:string, mentions:string[], autorQuote:string|null, citacao:object|null}}
    */
   dadosDaMensagem(ultima, texto) {
+    const blocoCitado = WADriver.obterCitacao(ultima);
+    const citacao = WADriver.lerCitacao(blocoCitado);
     // Menções (@) no DOM: atributo data-mention contém o telefone do mencionado
     const mentions = [];
     const selMention = WADriver._getSelector('mentionEl') || 'span[data-mention]';
     try {
       ultima.querySelectorAll(selMention).forEach((m) => {
+        if (blocoCitado?.contains(m)) return;
         const bruto = m.getAttribute('data-mention') || '';
         const digitos =
           typeof MentionDetector !== 'undefined' && MentionDetector.normalizarTelefone
@@ -714,17 +717,28 @@ ${htmlTrecho}`;
       });
     } catch (_) { /* seletor inválido: ignora */ }
 
-    // Citação (quote): autor é a primeira linha do bloco citado
-    let autorQuote = null;
-    const selQuote = WADriver._getSelector('quotedMessage') || '[data-testid="quoted-message"]';
-    try {
-      const quoteEl = ultima.querySelector(selQuote);
-      if (quoteEl && quoteEl.innerText) {
-        autorQuote = quoteEl.innerText.split('\n')[0].trim() || null;
-      }
-    } catch (_) { /* seletor inválido: ignora */ }
+    return { texto, mentions, autorQuote: citacao?.autor || null, citacao };
+  },
 
-    return { texto, mentions, autorQuote };
+  obterCitacao(elemento) {
+    const padrao = SELECTORS_DEFAULTS.quotedMessage.value;
+    const seletor = WADriver._getSelector('quotedMessage') || padrao;
+    const balao = elemento.closest('.message-in, .message-out') || elemento;
+    try {
+      return balao.querySelector(seletor) || balao.querySelector(padrao);
+    } catch (_) {
+      return balao.querySelector(padrao);
+    }
+  },
+
+  lerCitacao(bloco) {
+    if (!bloco) return null;
+    const linhas = (bloco.innerText || '').split('\n').map((linha) => linha.trim()).filter(Boolean);
+    const [autor, ...conteudo] = linhas;
+    const corpo = bloco.querySelector('.selectable-text, [data-testid="selectable-text"]');
+    const texto = (corpo?.innerText || conteudo.join('\n')).trim();
+    const rotuloDeMidia = /^(foto|imagem|vídeo|áudio|figurinha|documento|photo|image|video|audio|sticker|document)$/i;
+    return { autor: autor || null, texto: texto && !rotuloDeMidia.test(texto) ? texto.slice(0, 4000) : null };
   },
 
   /**
@@ -768,10 +782,12 @@ ${htmlTrecho}`;
       const historico = [];
 
       elementos.forEach((el) => {
+        const citado = WADriver.obterCitacao(el);
+        const foraDaCitacao = (node) => !citado || (!citado.contains(node) && !node.contains(citado));
         const textoEl =
-          el.querySelector(selectorTxt) ||
-          el.querySelector('.selectable-text, .copyable-text') ||
-          el;
+          [...el.querySelectorAll(selectorTxt)].find(foraDaCitacao) ||
+          [...el.querySelectorAll('.selectable-text, .copyable-text')].find(foraDaCitacao) ||
+          (foraDaCitacao(el) ? el : null);
         const textoMsg = textoEl && textoEl.innerText ? textoEl.innerText.trim() : '';
         if (!textoMsg) return;
 

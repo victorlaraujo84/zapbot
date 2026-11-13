@@ -400,8 +400,9 @@ async function varreduraChatsNaoLidos(settings) {
       if (anterior && anterior.chave !== chaveConv) gruposPendentes.delete(contatoId);
       for (const m of novas) {
         if (m.isMe || !m.id || mensagensRespondidas.has(m.id) || fila.has(m.id)) continue;
-        if (MentionDetector.detectar(WADriver.dadosDaMensagem(m.elemento, m.texto), settings.me_phone, settings.me_name)) {
-          fila.set(m.id, { id: m.id, texto: m.texto });
+        const dados = WADriver.dadosDaMensagem(m.elemento, m.texto);
+        if (MentionDetector.detectar(dados, settings.me_phone, settings.me_name)) {
+          fila.set(m.id, { id: m.id, texto: m.texto, citacao: dados.citacao });
         }
       }
       mensagem = fila.values().next().value;
@@ -429,7 +430,7 @@ async function varreduraChatsNaoLidos(settings) {
     try {
       const textoCliente = mensagem.texto;
       const contextoSalvo = ConversationStore.ultimas(conversasAtuais, chaveConv, 20);
-      await processarAutoRespostaIA(contatoId, textoCliente, historico, settings, contextoSalvo, destino);
+      await processarAutoRespostaIA(contatoId, textoCliente, historico, settings, contextoSalvo, destino, mensagem.citacao);
       // Registra o hash apenas após envio bem-sucedido
       mensagensRespondidas.set(hashMsg, true);
       // Em grupo monitorado, arma o temporizador de cobrança de retorno
@@ -483,7 +484,7 @@ async function logPulo(contato, motivo) {
   }
 }
 
-async function processarAutoRespostaIA(contato, textoCliente, historico, settings, contextoSalvo, destino) {
+async function processarAutoRespostaIA(contato, textoCliente, historico, settings, contextoSalvo, destino, citacao) {
   showToast(`🤖 ZapBot: Analisando mensagem de ${contato}...`, 'info');
 
   // Solicita a geração da resposta ao Service Worker (que chama a API de IA)
@@ -493,7 +494,8 @@ async function processarAutoRespostaIA(contato, textoCliente, historico, setting
       prompt: textoCliente,
       history: historico,
       settings,
-      contextoSalvo
+      contextoSalvo,
+      citacao
     }
   });
 
