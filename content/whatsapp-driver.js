@@ -45,7 +45,9 @@ const SELECTORS_DEFAULTS = {
     fallbacks: [
       'footer button[aria-label="Enviar"]',
       'footer button[aria-label="Send"]',
-      'footer span[data-icon="send"]'
+      'footer [data-icon="send"]',
+      'footer [data-testid="send"]',
+      'footer [data-icon="wds-ic-send-filled"]'
     ]
   },
   messageHistory: {
@@ -440,7 +442,8 @@ ${htmlTrecho}`;
     try {
       verificar();
       // Tenta obter a caixa com fallback de IA se necessário
-      const inputMsg = await WADriver.queryEl('composeBox', document, true);
+      const main = conferirDestino ? document.querySelector('#main') : document;
+      const inputMsg = main && await WADriver.queryEl('composeBox', main, !conferirDestino);
       if (!inputMsg) {
         throw new Error('Campo de digitação do WhatsApp não foi encontrado.');
       }
@@ -451,7 +454,10 @@ ${htmlTrecho}`;
       inputMsg.focus();
 
       // Insere o texto preservando quebras de linha e acentos
-      document.execCommand('insertText', false, texto);
+      const inserido = document.execCommand('insertText', false, texto);
+      if (conferirDestino && !inserido && !WADriver.textosDeEnvioIguais(inputMsg.innerText || inputMsg.textContent, texto)) {
+        throw new Error('O WhatsApp não aceitou o texto no campo de digitação.');
+      }
 
       // Dispara eventos sintéticos para sincronizar estado React do WhatsApp
       inputMsg.dispatchEvent(new InputEvent('input', { bubbles: true }));
@@ -461,10 +467,27 @@ ${htmlTrecho}`;
       await new Promise((r) => setTimeout(r, 600));
 
       // Localiza o botão Enviar (com fallback de IA)
-      const btnSend = await WADriver.queryEl('sendButton', document, true);
+      let btnSend;
+      if (conferirDestino) {
+        const prazoBotao = Date.now() + 2500;
+        do {
+          verificar();
+          const alvo = WADriver.queryElSync('sendButton', main);
+          btnSend = alvo?.closest('button, [role="button"]');
+          if (btnSend && !btnSend.disabled && btnSend.getAttribute('aria-disabled') !== 'true') break;
+          btnSend = null;
+          await new Promise((r) => setTimeout(r, 150));
+        } while (Date.now() < prazoBotao);
+        if (!btnSend) throw new Error('O botão Enviar do chat não ficou disponível. Verifique o rascunho no WhatsApp.');
+      } else {
+        btnSend = await WADriver.queryEl('sendButton', document, true);
+      }
 
       verificar();
       if (!inputMsg.isConnected) throw new Error('Campo de digitação foi substituído.');
+      if (conferirDestino && !WADriver.textosDeEnvioIguais(inputMsg.innerText || inputMsg.textContent, texto)) {
+        throw new Error('O texto do campo de digitação mudou. Envio cancelado.');
+      }
       if (btnSend) {
         // Se encontrou o ícone, sobe até o botão pai
         const btn = btnSend.closest('button') || btnSend;
@@ -492,7 +515,10 @@ ${htmlTrecho}`;
         if (WADriver.mensagemDeSaidaConfirmada(texto, anteriores)) return;
         await new Promise((r) => setTimeout(r, 200));
       }
-      const erro = new Error('Envio sem confirmação no chat. Confira a conversa antes de reenviar.');
+      const rascunho = WADriver.textosDeEnvioIguais(inputMsg.innerText || inputMsg.textContent, texto);
+      const erro = new Error(rascunho
+        ? 'O texto permaneceu no campo após clicar em Enviar. Confira o rascunho.'
+        : 'O campo foi limpo, mas a mensagem de saída não foi localizada. Confira a conversa antes de reenviar.');
       erro.code = 'SEND_UNCONFIRMED';
       throw erro;
     } finally {
@@ -510,15 +536,18 @@ ${htmlTrecho}`;
       }));
   },
 
-  mensagemDeSaidaConfirmada(texto, anteriores) {
+  textosDeEnvioIguais(a, b) {
     const normalizar = (valor) => (valor || '').normalize('NFC').replace(/\s+/g, ' ').trim();
-    const esperado = normalizar(texto);
+    return normalizar(a) === normalizar(b);
+  },
+
+  mensagemDeSaidaConfirmada(texto, anteriores) {
     const seletor = WADriver._getSelector('messageText') || 'span.selectable-text';
     return WADriver.baloesDeSaida().some(({ elemento, chave }) => {
       if (anteriores.has(chave)) return false;
       const corpo = elemento.querySelector(seletor) ||
         elemento.querySelector('[data-testid="selectable-text"], .selectable-text, .copyable-text');
-      return !!corpo && normalizar(corpo.innerText || corpo.textContent) === esperado;
+      return !!corpo && WADriver.textosDeEnvioIguais(corpo.innerText || corpo.textContent, texto);
     });
   },
 

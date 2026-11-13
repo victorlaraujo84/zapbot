@@ -72,7 +72,11 @@ test('troca de chat durante a preparação impede o clique de envio', async (t) 
   const btn = { closest: () => null, click: () => cliques++ };
   t.mock.method(WADriver, 'queryEl', async (key) => key === 'composeBox' ? input : btn);
   t.mock.method(WADriver, 'obterMensagensAtuais', () => []);
-  const globals = { document: { execCommand() {}, querySelector: () => null }, InputEvent: class {} };
+  const main = { querySelectorAll: () => [] };
+  const globals = {
+    document: { execCommand: () => { input.textContent = 'Resposta'; return true; }, querySelector: () => main },
+    InputEvent: class {}
+  };
   for (const [key, value] of Object.entries(globals)) {
     const descriptor = Object.getOwnPropertyDescriptor(globalThis, key);
     Object.defineProperty(globalThis, key, { value, configurable: true });
@@ -83,6 +87,48 @@ test('troca de chat durante a preparação impede o clique de envio', async (t) 
   }
   await assert.rejects(WADriver.enviarMensagemTexto('Resposta', () => ++verificacoes < 3), /chat ativo mudou/);
   assert.equal(cliques, 0);
+});
+
+test('envio protegido usa o botão do chat e aguarda um novo balão', async (t) => {
+  const mensagens = [];
+  const input = { textContent: '', isConnected: true, focus() {}, dispatchEvent() {} };
+  const main = { querySelectorAll: () => mensagens };
+  const botao = {
+    closest: () => botao,
+    getAttribute: () => null,
+    click() {
+      mensagens.push({
+        getAttribute: () => 'true_123@g.us_nova',
+        querySelector: () => ({ innerText: input.textContent })
+      });
+      mensagens[0].querySelector = () => ({ innerText: 'Resposta' });
+      input.textContent = '';
+    }
+  };
+  t.mock.method(WADriver, 'queryEl', async (key, scope) => {
+    assert.equal(scope, main);
+    assert.equal(key, 'composeBox');
+    return input;
+  });
+  t.mock.method(WADriver, 'queryElSync', (key, scope) => {
+    assert.equal(scope, main);
+    assert.equal(key, 'sendButton');
+    return botao;
+  });
+  const globals = {
+    document: { execCommand: (_, __, texto) => { input.textContent = texto; return true; }, querySelector: () => main },
+    InputEvent: class {}
+  };
+  for (const [key, value] of Object.entries(globals)) {
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, key);
+    Object.defineProperty(globalThis, key, { value, configurable: true });
+    t.after(() => {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+      else delete globalThis[key];
+    });
+  }
+  await WADriver.enviarMensagemTexto('Resposta', () => true);
+  assert.equal(mensagens.length, 1);
 });
 
 test('grupo monitorado com lista vazia responde à menção anterior e tenta novamente sem badge', async () => {
